@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		28A712863033DEFD00964C50 /* WestminsterLunch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 28A712853033DEFD00964C50 /* WestminsterLunch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		28A712A03033DF5900964C50 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28A7129F3033DF5900964C50 /* WidgetKit.framework */; };
+		28A712A23033DF5900964C50 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28A712A13033DF5900964C50 /* SwiftUI.framework */; };
+		28A712AF3033DF5C00964C50 /* MaloneWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 28A7129D3033DF5900964C50 /* MaloneWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -17,6 +20,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 28A712843033DEFD00964C50;
 			remoteInfo = "WestminsterLunch Watch App";
+		};
+		28A712AD3033DF5C00964C50 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 28A712793033DEFD00964C50 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 28A7129C3033DF5900964C50;
+			remoteInfo = MaloneWidgetExtension;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -32,17 +42,50 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		28A712B43033DF5C00964C50 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				28A712AF3033DF5C00964C50 /* MaloneWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		28A7127F3033DEFD00964C50 /* WestminsterLunch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WestminsterLunch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		28A712853033DEFD00964C50 /* WestminsterLunch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "WestminsterLunch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		28A7129D3033DF5900964C50 /* MaloneWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MaloneWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		28A7129F3033DF5900964C50 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		28A712A13033DF5900964C50 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		28A712B63033E24B00964C50 /* MaloneWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MaloneWidgetExtension.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		28A712B03033DF5C00964C50 /* Exceptions for "MaloneWidget" folder in "MaloneWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 28A7129C3033DF5900964C50 /* MaloneWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		28A712893033DEFD00964C50 /* WestminsterLunch Watch App */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = "WestminsterLunch Watch App";
+			sourceTree = "<group>";
+		};
+		28A712A33033DF5900964C50 /* MaloneWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				28A712B03033DF5C00964C50 /* Exceptions for "MaloneWidget" folder in "MaloneWidgetExtension" target */,
+			);
+			path = MaloneWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -55,13 +98,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		28A7129A3033DF5900964C50 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28A712A23033DF5900964C50 /* SwiftUI.framework in Frameworks */,
+				28A712A03033DF5900964C50 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		28A712783033DEFD00964C50 = {
 			isa = PBXGroup;
 			children = (
+				28A712B63033E24B00964C50 /* MaloneWidgetExtension.entitlements */,
 				28A712893033DEFD00964C50 /* WestminsterLunch Watch App */,
+				28A712A33033DF5900964C50 /* MaloneWidget */,
+				28A7129E3033DF5900964C50 /* Frameworks */,
 				28A712803033DEFD00964C50 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -71,8 +126,18 @@
 			children = (
 				28A7127F3033DEFD00964C50 /* WestminsterLunch.app */,
 				28A712853033DEFD00964C50 /* WestminsterLunch Watch App.app */,
+				28A7129D3033DF5900964C50 /* MaloneWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		28A7129E3033DF5900964C50 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				28A7129F3033DF5900964C50 /* WidgetKit.framework */,
+				28A712A13033DF5900964C50 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -104,10 +169,12 @@
 				28A712813033DEFD00964C50 /* Sources */,
 				28A712823033DEFD00964C50 /* Frameworks */,
 				28A712833033DEFD00964C50 /* Resources */,
+				28A712B43033DF5C00964C50 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				28A712AE3033DF5C00964C50 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				28A712893033DEFD00964C50 /* WestminsterLunch Watch App */,
@@ -118,6 +185,28 @@
 			productName = "WestminsterLunch Watch App";
 			productReference = 28A712853033DEFD00964C50 /* WestminsterLunch Watch App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		28A7129C3033DF5900964C50 /* MaloneWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 28A712B13033DF5C00964C50 /* Build configuration list for PBXNativeTarget "MaloneWidgetExtension" */;
+			buildPhases = (
+				28A712993033DF5900964C50 /* Sources */,
+				28A7129A3033DF5900964C50 /* Frameworks */,
+				28A7129B3033DF5900964C50 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				28A712A33033DF5900964C50 /* MaloneWidget */,
+			);
+			name = MaloneWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = MaloneWidgetExtension;
+			productReference = 28A7129D3033DF5900964C50 /* MaloneWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -133,6 +222,9 @@
 						CreatedOnToolsVersion = 26.5;
 					};
 					28A712843033DEFD00964C50 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					28A7129C3033DF5900964C50 = {
 						CreatedOnToolsVersion = 26.5;
 					};
 				};
@@ -153,6 +245,7 @@
 			targets = (
 				28A7127E3033DEFD00964C50 /* WestminsterLunch */,
 				28A712843033DEFD00964C50 /* WestminsterLunch Watch App */,
+				28A7129C3033DF5900964C50 /* MaloneWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -172,10 +265,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		28A7129B3033DF5900964C50 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		28A712813033DEFD00964C50 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		28A712993033DF5900964C50 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -189,6 +296,11 @@
 			isa = PBXTargetDependency;
 			target = 28A712843033DEFD00964C50 /* WestminsterLunch Watch App */;
 			targetProxy = 28A712873033DEFD00964C50 /* PBXContainerItemProxy */;
+		};
+		28A712AE3033DF5C00964C50 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 28A7129C3033DF5900964C50 /* MaloneWidgetExtension */;
+			targetProxy = 28A712AD3033DF5C00964C50 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -312,8 +424,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "WestminsterLunch Watch App/WestminsterLunch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3Z3H95JK6Y;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = WestminsterLunch;
@@ -330,7 +444,7 @@
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -344,8 +458,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "WestminsterLunch Watch App/WestminsterLunch Watch App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3Z3H95JK6Y;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = WestminsterLunch;
@@ -362,7 +478,7 @@
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -377,6 +493,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3Z3H95JK6Y;
 				INFOPLIST_KEY_CFBundleDisplayName = WestminsterLunch;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Christopherson.WestminsterLunch;
@@ -393,6 +510,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3Z3H95JK6Y;
 				INFOPLIST_KEY_CFBundleDisplayName = WestminsterLunch;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Christopherson.WestminsterLunch;
@@ -402,6 +520,75 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		28A712B23033DF5C00964C50 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = MaloneWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3Z3H95JK6Y;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MaloneWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MaloneWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Christopherson.WestminsterLunch.watchkitapp.MaloneWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
+			};
+			name = Debug;
+		};
+		28A712B33033DF5C00964C50 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = MaloneWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 3Z3H95JK6Y;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = MaloneWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = MaloneWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Christopherson.WestminsterLunch.watchkitapp.MaloneWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.5;
 			};
 			name = Release;
 		};
@@ -431,6 +618,15 @@
 			buildConfigurations = (
 				28A712973033DF0000964C50 /* Debug */,
 				28A712983033DF0000964C50 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		28A712B13033DF5C00964C50 /* Build configuration list for PBXNativeTarget "MaloneWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				28A712B23033DF5C00964C50 /* Debug */,
+				28A712B33033DF5C00964C50 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

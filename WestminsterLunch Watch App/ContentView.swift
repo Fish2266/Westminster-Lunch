@@ -1,24 +1,39 @@
-//
-//  ContentView.swift
-//  WestminsterLunch Watch App
-//
-//  Created by Connor Christopherson on 8/17/26.
-//
-
 import SwiftUI
 
 struct ContentView: View {
+    private var todayString: String {
+        Date().formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
+    }
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        ScrollView {
+            VStack(spacing: 12) {
+                VStack(spacing: 2) {
+                    Text("WESTMINSTER LUNCH")
+                        .font(.system(.headline, design: .rounded))
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(todayString)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
+
+                ForEach(DiningLocation.all) { location in
+                    NavigationLink(value: location) {
+                        LocationCardView(location: location)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
         }
-        .padding()
     }
 }
 
 #Preview {
-    ContentView()
+    NavigationStack {
+        ContentView()
+    }
 }
