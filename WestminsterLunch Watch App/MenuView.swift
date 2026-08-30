@@ -20,12 +20,23 @@ struct MenuView: View {
     /// publish further out and further swiping would be useful.
     private static let schoolDaysEitherWay = 5
 
-    /// Resolved once, when the view is created, so the pages (and therefore
-    /// the selected index) don't shift underneath the person if the date rolls
-    /// over while they're looking at the screen.
-    private let days: [Date]
+    /// Resolved once per visit to this screen, so the pages don't shift
+    /// underneath the person if the date rolls over while they're looking at
+    /// the screen.
+    ///
+    /// This has to be `@State`, not a plain `let` assigned in `init`: SwiftUI
+    /// re-creates the view struct on every parent update, so a `let` would
+    /// re-read `Date()` each time and quietly rebuild the window around a new
+    /// "today". `State(initialValue:)` is honoured only when the view's
+    /// identity is first established, which is the behaviour actually wanted.
+    @State private var days: [Date]
 
-    @State private var selectedIndex: Int
+    /// The selection is the day itself rather than an index into `days`, which
+    /// is also what gives each page its `ForEach` identity. Keying by position
+    /// instead would mean that if `days` ever did shift, page 3 would keep the
+    /// `MenuDayView` (and its already-loaded `MenuViewModel`) built for the
+    /// previous day 3 — showing one day's menu under another day's heading.
+    @State private var selectedDay: Date
 
     init(location: DiningLocation) {
         self.location = location
@@ -33,16 +44,17 @@ struct MenuView: View {
             back: Self.schoolDaysEitherWay,
             forward: Self.schoolDaysEitherWay
         )
-        self.days = days
+        _days = State(initialValue: days)
         // Start on the centre page: today, or the next school day on a weekend.
-        _selectedIndex = State(initialValue: Self.schoolDaysEitherWay)
+        // Taken from `days` rather than recomputed, so the two can't disagree.
+        _selectedDay = State(initialValue: days[Self.schoolDaysEitherWay])
     }
 
     var body: some View {
-        TabView(selection: $selectedIndex) {
-            ForEach(Array(days.enumerated()), id: \.offset) { index, date in
-                MenuDayView(location: location, date: date)
-                    .tag(index)
+        TabView(selection: $selectedDay) {
+            ForEach(days, id: \.self) { day in
+                MenuDayView(location: location, date: day)
+                    .tag(day)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .automatic))

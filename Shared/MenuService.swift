@@ -15,7 +15,9 @@ enum MenuServiceError: Error, LocalizedError, Equatable {
         case .decoding(let message):
             return "Couldn't read the menu data: \(message)"
         case .noDataForDate:
-            return "No menu has been published for today yet."
+            // Deliberately not "for today": this surfaces for whichever day is
+            // on screen, and the person may well have swiped to next Tuesday.
+            return "No menu has been published for this day yet."
         }
     }
 }
@@ -28,16 +30,23 @@ enum MenuServiceError: Error, LocalizedError, Equatable {
 ///                                                    day in the week)
 ///                                                  ↘ requested day returned
 ///
-/// An `actor` is used so concurrent calls from the app and widget (which run in
-/// separate processes but share this type's source) can't race on the cache.
+/// An `actor` is used so the many concurrent calls within a single process —
+/// the swipeable day pages all loading at once, the widget fetching both
+/// locations in parallel — can't race on the cache. (The app and the widget run
+/// in separate processes, where the shared `UserDefaults` container, not this
+/// actor, is what keeps writes coherent.)
 actor MenuService {
     static let shared = MenuService()
 
     private let session: URLSession
-    private let cache = MenuCache()
+    private let cache: MenuCache
 
-    init(session: URLSession = MenuService.makeDefaultSession()) {
+    init(
+        session: URLSession = MenuService.makeDefaultSession(),
+        cache: MenuCache = MenuCache()
+    ) {
         self.session = session
+        self.cache = cache
     }
 
     /// A session with hard, short timeouts.
@@ -65,17 +74,31 @@ actor MenuService {
         do {
             let fresh = try await fetchDayCachingWholeWeek(location: location, date: date)
             return .success(fresh)
-        } catch let error as MenuServiceError {
-            if let cached = cache.load(for: location, date: date) {
-                return .success(cached)
-            }
-            return .failure(error)
         } catch {
             if let cached = cache.load(for: location, date: date) {
                 return .success(cached)
             }
-            return .failure(.network(error.localizedDescription))
+            return .failure(Self.menuServiceError(from: error))
         }
+    }
+
+    /// The menu for `date`, reusing today's download if there already is one.
+    ///
+    /// This applies the same rule `prefetchEssentials` has always used — a menu
+    /// downloaded at any point today is not downloaded again, because Flik
+    /// doesn't change a lunch once it's published. The day pages call this when
+    /// they first appear, so swiping back and forth through the week doesn't
+    /// re-download the same week for every page.
+    ///
+    /// The Refresh button and pull-to-refresh deliberately call `menu(for:date:)`
+    /// instead: when someone explicitly asks for fresh data, they get a real
+    /// request.
+    func cachedOrFreshMenu(for location: DiningLocation, date: Date = Date()) async -> Result<DayMenu, MenuServiceError> {
+        if let cached = cache.load(for: location, date: date),
+           Calendar.current.isDate(cached.fetchedAt, inSameDayAs: Date()) {
+            return .success(cached)
+        }
+        return await menu(for: location, date: date)
     }
 
     /// Returns cached data immediately, without touching the network. The widget
@@ -117,15 +140,14 @@ actor MenuService {
                 let fresh = try await fetchDayCachingWholeWeek(location: location, date: day)
                 if result == nil { result = .success(fresh) }
             } catch {
-                let failure: Result<DayMenu, MenuServiceError>
+                // A stale cached copy of this day still beats showing nothing.
+                let outcome: Result<DayMenu, MenuServiceError>
                 if let cached {
-                    failure = .success(cached)
-                } else if let error = error as? MenuServiceError {
-                    failure = .failure(error)
+                    outcome = .success(cached)
                 } else {
-                    failure = .failure(.network(error.localizedDescription))
+                    outcome = .failure(Self.menuServiceError(from: error))
                 }
-                if result == nil { result = failure }
+                if result == nil { result = outcome }
             }
         }
 
@@ -134,21 +156,57 @@ actor MenuService {
         return result ?? .failure(.noDataForDate)
     }
 
+    /// The download currently running for each location, so callers that arrive
+    /// while one is in flight can wait for it instead of starting their own.
+    private var runningFetches: [String: Task<[DayMenu], Error>] = [:]
+
     /// Fetches the week containing `date` and caches **every** day in it, then
     /// returns the one for `date`. Caching the sibling days is free — the
     /// response already contains them — and it's what lets tomorrow's menu be
     /// available offline without a second request.
+    ///
+    /// When several day pages appear at once they all land here within
+    /// milliseconds of each other, before any of them has written to the cache.
+    /// Since one response covers a whole week, a caller that finds a download
+    /// already running for this location waits for it and takes its day out of
+    /// the result — turning a screenful of pages into one request instead of
+    /// one request each. A caller whose day isn't in that week (the window
+    /// spans two of them) still goes and fetches its own.
     private func fetchDayCachingWholeWeek(location: DiningLocation, date: Date) async throws -> DayMenu {
-        let week = try await fetchWeekFromNetwork(location: location, date: date)
+        if let running = runningFetches[location.schoolSlug],
+           let week = try? await running.value,
+           let match = Self.day(matching: date, in: week) {
+            return match
+        }
+
+        // Deliberately unstructured: the point is for *other* callers to be
+        // able to await this same work, which a child task couldn't offer them.
+        // `URLSession`'s own timeouts bound how long it can live.
+        let task = Task { try await self.fetchWeekFromNetwork(location: location, date: date) }
+        runningFetches[location.schoolSlug] = task
+        defer {
+            // Only clear our own entry: a second caller whose day wasn't in our
+            // week may already have replaced it with its download.
+            if runningFetches[location.schoolSlug] == task {
+                runningFetches[location.schoolSlug] = nil
+            }
+        }
+
+        let week = try await task.value
         for day in week {
             cache.save(day, for: location)
         }
+        cache.pruneExpiredEntries(for: location)
 
-        let calendar = Calendar.current
-        guard let match = week.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) else {
+        guard let match = Self.day(matching: date, in: week) else {
             throw MenuServiceError.noDataForDate
         }
         return match
+    }
+
+    private static func day(matching date: Date, in week: [DayMenu]) -> DayMenu? {
+        let calendar = Calendar.current
+        return week.first { calendar.isDate($0.date, inSameDayAs: date) }
     }
 
     /// Downloads the week containing `date` and turns every school day in it
@@ -204,8 +262,15 @@ actor MenuService {
 
     /// Parses "yyyy-MM-dd" into local midnight, so a menu's `date` always lines
     /// up with the calendar day the rest of the app (and the cache key) uses.
+    ///
+    /// The POSIX locale is required, not optional polish: a `dateFormat` this
+    /// fixed is interpreted through the formatter's locale, so on a watch set to
+    /// a non-Gregorian calendar (Japanese, Buddhist) or a locale with its own
+    /// numbering system, the default locale would parse these strings into the
+    /// wrong year — or fail outright, dropping every day of the week silently.
     private static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.timeZone = Calendar.current.timeZone
@@ -248,6 +313,13 @@ actor MenuService {
             categories: sortCategories(categories, preferredOrder: location.preferredCategoryOrder),
             fetchedAt: fetchedAt
         )
+    }
+
+    /// Normalizes a caught error. Everything this type throws is already a
+    /// `MenuServiceError`, but `catch` still hands back a bare `Error`, and both
+    /// call sites want the same fallback for the theoretical rest.
+    private static func menuServiceError(from error: Error) -> MenuServiceError {
+        (error as? MenuServiceError) ?? .network(error.localizedDescription)
     }
 
     /// Puts any category named in `preferredOrder` first, in that exact order.

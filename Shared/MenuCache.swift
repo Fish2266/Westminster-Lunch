@@ -10,8 +10,19 @@ import Foundation
 ///   Flik server → MenuService → MenuCache (App Group) → Watch app UI
 ///                                                     ↘ Malone Widget
 struct MenuCache {
-    private var defaults: UserDefaults? {
-        UserDefaults(suiteName: AppGroup.identifier)
+    /// How far back cached days are kept. Nothing in the app ever looks further
+    /// back than a week or two, and the widget's `loadMostRecent(for:)` has to
+    /// scan whatever is here, so letting every day the person ever swiped past
+    /// accumulate in the App Group container would only slow it down.
+    private static let retentionDays = 30
+
+    private let defaults: UserDefaults?
+
+    /// The default is the shared App Group container — the only thing production
+    /// ever uses. The parameter exists so tests can hand in a throwaway suite
+    /// instead of reading and pruning the real cache.
+    init(defaults: UserDefaults? = UserDefaults(suiteName: AppGroup.identifier)) {
+        self.defaults = defaults
     }
 
     private func keyPrefix(for location: DiningLocation) -> String {
@@ -22,6 +33,24 @@ struct MenuCache {
         let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
         let dateString = "\(components.year ?? 0)-\(components.month ?? 0)-\(components.day ?? 0)"
         return keyPrefix(for: location) + dateString
+    }
+
+    /// The day a key was written for, recovered from the key itself. Lets the
+    /// prune and most-recent scans order entries without decoding every blob.
+    private func day(fromKey key: String, prefix: String) -> Date? {
+        let parts = key.dropFirst(prefix.count).split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        let components = DateComponents(year: parts[0], month: parts[1], day: parts[2])
+        return Calendar.current.date(from: components)
+    }
+
+    private func cachedKeys(for location: DiningLocation, in defaults: UserDefaults) -> [(key: String, date: Date)] {
+        let prefix = keyPrefix(for: location)
+        return defaults.dictionaryRepresentation().keys
+            .compactMap { key -> (key: String, date: Date)? in
+                guard key.hasPrefix(prefix), let date = day(fromKey: key, prefix: prefix) else { return nil }
+                return (key: key, date: date)
+            }
     }
 
     /// Saves under the menu's own `date` field, so callers never need to pass
@@ -46,14 +75,35 @@ struct MenuCache {
     /// the wrist, or the app hasn't been opened yet today). Showing yesterday's
     /// items, clearly dated, beats rendering an empty widget — which is what the
     /// day-keyed `load(for:date:)` alone would produce.
+    ///
+    /// Keys are sorted by their own encoded day and decoded newest-first, so the
+    /// usual case reads exactly one blob rather than all of them — this runs
+    /// inside the widget's very short timeline budget.
     func loadMostRecent(for location: DiningLocation) -> DayMenu? {
         guard let defaults else { return nil }
-        let prefix = keyPrefix(for: location)
-        return defaults.dictionaryRepresentation().keys
-            .filter { $0.hasPrefix(prefix) }
-            .compactMap { defaults.data(forKey: $0) }
-            .compactMap(decode)
-            .max(by: { $0.date < $1.date })
+        for entry in cachedKeys(for: location, in: defaults).sorted(by: { $0.date > $1.date }) {
+            if let data = defaults.data(forKey: entry.key), let menu = decode(data) {
+                return menu
+            }
+        }
+        return nil
+    }
+
+    /// Drops entries older than `retentionDays`. Called once after a whole
+    /// week has been saved rather than from `save` itself, so a single fetch
+    /// doesn't re-scan the container five times over.
+    func pruneExpiredEntries(for location: DiningLocation) {
+        guard let defaults else { return }
+        let calendar = Calendar.current
+        guard let cutoff = calendar.date(
+            byAdding: .day,
+            value: -Self.retentionDays,
+            to: calendar.startOfDay(for: Date())
+        ) else { return }
+
+        for entry in cachedKeys(for: location, in: defaults) where entry.date < cutoff {
+            defaults.removeObject(forKey: entry.key)
+        }
     }
 
     private func decode(_ data: Data) -> DayMenu? {

@@ -23,18 +23,29 @@ final class MenuViewModel: ObservableObject {
         self.date = date
     }
 
-    /// Called from `.task {}` — only loads if we haven't already, so navigating
-    /// back and forth doesn't refetch unnecessarily. Automatic refresh on open.
+    /// Called from `.task {}` when the page appears. Only loads if we haven't
+    /// already, so navigating back and forth doesn't refetch, and reuses a copy
+    /// downloaded earlier today rather than re-requesting a menu that can't have
+    /// changed — swiping across the week used to cost one download per page.
     func loadIfNeeded() async {
         guard case .loading = state else { return }
-        await refresh()
+        await load(forcingNetwork: false)
     }
 
+    /// The Refresh button and pull-to-refresh. Always goes to the network:
+    /// asking for fresh data should get fresh data.
     func refresh() async {
+        await load(forcingNetwork: true)
+    }
+
+    private func load(forcingNetwork: Bool) async {
         isRefreshing = true
         defer { isRefreshing = false }
 
-        let result = await service.menu(for: location, date: date)
+        let result = forcingNetwork
+            ? await service.menu(for: location, date: date)
+            : await service.cachedOrFreshMenu(for: location, date: date)
+
         switch result {
         case .success(let menu):
             lastUpdated = menu.fetchedAt

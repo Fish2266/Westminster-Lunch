@@ -5,8 +5,20 @@ struct MaloneWidgetEntryView: View {
     @Environment(\.widgetFamily) private var family
     let entry: MaloneEntry
 
+    // The accessory families are too small for semantic text styles — these
+    // sizes are hand-tuned to fit two Malone items beside three sandwiches.
+    // `@ScaledMetric` keeps that exact layout at the default text size while
+    // still honouring a larger (or smaller) watch text setting; every label
+    // below pairs it with `minimumScaleFactor` so growing text shrinks to fit
+    // rather than truncating.
+    @ScaledMetric(relativeTo: .caption) private var headerSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .caption) private var itemSize: CGFloat = 11
+    @ScaledMetric(relativeTo: .caption) private var messageSize: CGFloat = 12
+    @ScaledMetric(relativeTo: .caption2) private var detailSize: CGFloat = 9
+    @ScaledMetric(relativeTo: .caption) private var glyphSize: CGFloat = 14
+
     private var deepLinkURL: URL? {
-        URL(string: "westminsterlunch://open?location=malone")
+        DeepLink.url(for: .malone)
     }
 
     private var maloneItemNames: [String] {
@@ -71,10 +83,14 @@ struct MaloneWidgetEntryView: View {
             if maloneItemNames.isEmpty && hawkinsSandwichNames.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("MALONE")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: headerSize, weight: .bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                         .accessibilityAddTraits(.isHeader)
                     Text(entry.errorMessage == nil ? "No menu today" : "Unavailable")
-                        .font(.system(size: 12))
+                        .font(.system(size: messageSize))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -105,14 +121,16 @@ struct MaloneWidgetEntryView: View {
     private var maloneColumn: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(staleDayLabel.map { "MALONE · \($0)" } ?? "MALONE")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: headerSize, weight: .bold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .accessibilityAddTraits(.isHeader)
-            columnOfItems(maloneItemNames.prefix(2))
+            columnOfItems(Array(maloneItemNames.prefix(2)))
             if maloneItemNames.count > 2 {
                 Text("+\(maloneItemNames.count - 2) more")
-                    .font(.system(size: 9))
+                    .font(.system(size: detailSize))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                     .foregroundStyle(.secondary)
             }
         }
@@ -122,7 +140,9 @@ struct MaloneWidgetEntryView: View {
     private var sandwichesColumn: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text("SANDWICHES")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: headerSize, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .accessibilityAddTraits(.isHeader)
             columnOfItems(hawkinsSandwichNames)
         }
@@ -132,7 +152,7 @@ struct MaloneWidgetEntryView: View {
     private var accessibilityText: String {
         var parts: [String] = []
         if !maloneItemNames.isEmpty {
-            let when = staleDayLabel == nil ? "" : " from \(staleDayLabel!)"
+            let when = staleDayLabel.map { " from \($0)" } ?? ""
             parts.append("Malone lunch\(when): \(maloneItemNames.joined(separator: ", "))")
         }
         if !hawkinsSandwichNames.isEmpty {
@@ -141,11 +161,14 @@ struct MaloneWidgetEntryView: View {
         return parts.isEmpty ? "No menu available" : parts.joined(separator: ". ")
     }
 
-    private func columnOfItems<S: Sequence>(_ names: S) -> some View where S.Element == String {
+    private func columnOfItems(_ names: [String]) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            ForEach(Array(names), id: \.self) { name in
-                Text(name)
-                    .font(.system(size: 11))
+            // Keyed by position rather than by the name itself: nothing
+            // guarantees Flik's item names are unique within a day, and a
+            // name-keyed ForEach would silently drop any duplicate.
+            ForEach(names.indices, id: \.self) { index in
+                Text(names[index])
+                    .font(.system(size: itemSize))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
@@ -160,9 +183,9 @@ struct MaloneWidgetEntryView: View {
     private var circular: some View {
         VStack(spacing: 1) {
             Image(systemName: "fork.knife")
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: glyphSize, weight: .bold))
             Text(maloneItemNames.first ?? "Malone")
-                .font(.system(size: 9))
+                .font(.system(size: detailSize))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
