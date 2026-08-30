@@ -7,12 +7,30 @@
 		<key>MaloneWidgetExtension.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>1</integer>
+			<integer>0</integer>
 		</dict>
 		<key>WestminsterLunch Watch App.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>1</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>28A7127E3033DEFD00964C50</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>28A712843033DEFD00964C50</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>28A7129C3033DF5900964C50</key>
+		<dict>
+			<key>primary</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>
