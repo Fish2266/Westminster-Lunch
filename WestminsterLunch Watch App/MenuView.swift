@@ -14,6 +14,10 @@ import SwiftUI
 /// unlimited swiping would just page through empty screens forever with no way
 /// to find your way back to today easily.
 struct MenuView: View {
+    /// Fixed for the life of one instance. The pages below capture it when
+    /// their view models are created, so presenting this view for a different
+    /// hall requires a fresh identity — see the `.id(location)` on the
+    /// `navigationDestination` in `WestminsterLunchApp`.
     let location: DiningLocation
 
     /// A school week back, a school week ahead. Adjust if Flik turns out to

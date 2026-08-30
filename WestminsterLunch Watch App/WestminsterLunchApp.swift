@@ -10,7 +10,16 @@ struct WestminsterLunchApp: App {
             NavigationStack(path: $router.path) {
                 ContentView()
                     .navigationDestination(for: DiningLocation.self) { location in
+                        // A different dining hall is a different screen, and
+                        // has to be declared as one. Tapping the widget while
+                        // already viewing Hawkins replaces the stack's single
+                        // entry rather than growing it, so without this SwiftUI
+                        // reuses the existing view's identity: the title tracks
+                        // `location` and updates to "Malone", but MenuDayView's
+                        // @StateObject was built once with Hawkins and keeps
+                        // serving the Hawkins menu underneath it.
                         MenuView(location: location)
+                            .id(location)
                     }
             }
             .environmentObject(router)
