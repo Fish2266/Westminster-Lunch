@@ -24,8 +24,9 @@ enum MenuServiceError: Error, LocalizedError, Equatable {
 /// app and the widget extension — neither has any networking or parsing logic
 /// of its own.
 ///
-///   Flik server → MenuService.fetchFromNetwork → MenuCache.save
-///                                              ↘ returned to caller
+///   Flik server → MenuService.fetchWeekFromNetwork → MenuCache.save (every
+///                                                    day in the week)
+///                                                  ↘ requested day returned
 ///
 /// An `actor` is used so concurrent calls from the app and widget (which run in
 /// separate processes but share this type's source) can't race on the cache.
@@ -62,8 +63,7 @@ actor MenuService {
     /// if one exists, so the UI can still show something useful offline.
     func menu(for location: DiningLocation, date: Date = Date()) async -> Result<DayMenu, MenuServiceError> {
         do {
-            let fresh = try await fetchFromNetwork(location: location, date: date)
-            cache.save(fresh, for: location)
+            let fresh = try await fetchDayCachingWholeWeek(location: location, date: date)
             return .success(fresh)
         } catch let error as MenuServiceError {
             if let cached = cache.load(for: location, date: date) {
@@ -92,7 +92,69 @@ actor MenuService {
         cache.loadMostRecent(for: location)
     }
 
-    private func fetchFromNetwork(location: DiningLocation, date: Date) async throws -> DayMenu {
+    /// Makes sure the two days that always matter — the current school day and
+    /// the next one — are sitting in the cache, fetching only what's missing or
+    /// stale. Called on app launch and from the widget's timeline refresh, so
+    /// that a watch with no network can still render both days.
+    ///
+    /// Because Nutrislice serves a whole week per request and
+    /// `fetchDayCachingWholeWeek` caches every day of it, this is usually a
+    /// single network call covering both days — two only when the next school
+    /// day falls in the following week (i.e. on a Friday).
+    @discardableResult
+    func prefetchEssentials(for location: DiningLocation, now: Date = Date()) async -> Result<DayMenu, MenuServiceError> {
+        var result: Result<DayMenu, MenuServiceError>?
+
+        for day in SchoolCalendar.daysToKeepCached(from: now) {
+            let cached = cache.load(for: location, date: day)
+            if let cached, Calendar.current.isDate(cached.fetchedAt, inSameDayAs: now) {
+                // Already downloaded today; lunch doesn't change once published.
+                if result == nil { result = .success(cached) }
+                continue
+            }
+
+            do {
+                let fresh = try await fetchDayCachingWholeWeek(location: location, date: day)
+                if result == nil { result = .success(fresh) }
+            } catch {
+                let failure: Result<DayMenu, MenuServiceError>
+                if let cached {
+                    failure = .success(cached)
+                } else if let error = error as? MenuServiceError {
+                    failure = .failure(error)
+                } else {
+                    failure = .failure(.network(error.localizedDescription))
+                }
+                if result == nil { result = failure }
+            }
+        }
+
+        // The loop always runs at least once, so this fallback is unreachable
+        // in practice — it just keeps the signature non-optional.
+        return result ?? .failure(.noDataForDate)
+    }
+
+    /// Fetches the week containing `date` and caches **every** day in it, then
+    /// returns the one for `date`. Caching the sibling days is free — the
+    /// response already contains them — and it's what lets tomorrow's menu be
+    /// available offline without a second request.
+    private func fetchDayCachingWholeWeek(location: DiningLocation, date: Date) async throws -> DayMenu {
+        let week = try await fetchWeekFromNetwork(location: location, date: date)
+        for day in week {
+            cache.save(day, for: location)
+        }
+
+        let calendar = Calendar.current
+        guard let match = week.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) else {
+            throw MenuServiceError.noDataForDate
+        }
+        return match
+    }
+
+    /// Downloads the week containing `date` and turns every school day in it
+    /// into a `DayMenu`. Weekend entries are dropped: no food is served, so
+    /// nothing in the app ever needs them.
+    private func fetchWeekFromNetwork(location: DiningLocation, date: Date) async throws -> [DayMenu] {
         guard let url = NutrisliceConfig.weekMenuURL(for: location, weekOf: date) else {
             throw MenuServiceError.invalidURL
         }
@@ -132,16 +194,25 @@ actor MenuService {
             throw MenuServiceError.decoding(error.localizedDescription)
         }
 
-        let dayFormatter = DateFormatter()
-        dayFormatter.calendar = Calendar(identifier: .gregorian)
-        dayFormatter.dateFormat = "yyyy-MM-dd"
-        dayFormatter.timeZone = TimeZone(identifier: "America/New_York")
-
-        let targetDateString = dayFormatter.string(from: date)
-        guard let matchingDay = week.days.first(where: { $0.date == targetDateString }) else {
-            throw MenuServiceError.noDataForDate
+        let fetchedAt = Date()
+        return week.days.compactMap { day in
+            guard let dayDate = Self.dayFormatter.date(from: day.date),
+                  SchoolCalendar.isSchoolDay(dayDate) else { return nil }
+            return dayMenu(from: day, location: location, date: dayDate, fetchedAt: fetchedAt)
         }
+    }
 
+    /// Parses "yyyy-MM-dd" into local midnight, so a menu's `date` always lines
+    /// up with the calendar day the rest of the app (and the cache key) uses.
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = Calendar.current.timeZone
+        return formatter
+    }()
+
+    private func dayMenu(from day: NutrisliceDay, location: DiningLocation, date: Date, fetchedAt: Date) -> DayMenu {
         // Group items under the most recent preceding section title, preserving
         // the order Flik returns them in. No category names or items are assumed
         // or hardcoded — whatever Flik provides is what gets displayed.
@@ -149,7 +220,7 @@ actor MenuService {
         var categoryOrder: [String] = []
         var currentCategory = "Menu"
 
-        for entry in matchingDay.menuItems {
+        for entry in day.menuItems {
             if entry.isSectionTitle == true, let title = entry.text, !title.isEmpty {
                 currentCategory = title
                 if !categoryOrder.contains(currentCategory) {
@@ -171,13 +242,11 @@ actor MenuService {
             return MenuCategory(name: name, items: items)
         }
 
-        let sortedCategories = sortCategories(categories, preferredOrder: location.preferredCategoryOrder)
-
         return DayMenu(
             locationSlug: location.schoolSlug,
             date: Calendar.current.startOfDay(for: date),
-            categories: sortedCategories,
-            fetchedAt: Date()
+            categories: sortCategories(categories, preferredOrder: location.preferredCategoryOrder),
+            fetchedAt: fetchedAt
         )
     }
 

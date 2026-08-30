@@ -17,6 +17,20 @@ struct WestminsterLunchApp: App {
             .onOpenURL { url in
                 router.handle(url: url)
             }
+            // Warm the shared cache with the current school day and the next
+            // one every time the app opens, so both the app and the widget can
+            // render them later with no network at all. Fetching a day pulls
+            // its whole week down in one request, so this is normally a single
+            // call per location.
+            .task {
+                await withTaskGroup(of: Void.self) { group in
+                    for location in DiningLocation.all {
+                        group.addTask {
+                            await MenuService.shared.prefetchEssentials(for: location)
+                        }
+                    }
+                }
+            }
         }
     }
 }

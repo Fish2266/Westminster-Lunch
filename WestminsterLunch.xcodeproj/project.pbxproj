@@ -80,17 +80,17 @@
 			path = "WestminsterLunch Watch App";
 			sourceTree = "<group>";
 		};
-		28A712C03033DF5C00964C50 /* Shared */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Shared;
-			sourceTree = "<group>";
-		};
 		28A712A33033DF5900964C50 /* MaloneWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				28A712B03033DF5C00964C50 /* Exceptions for "MaloneWidget" folder in "MaloneWidgetExtension" target */,
 			);
 			path = MaloneWidget;
+			sourceTree = "<group>";
+		};
+		28A712C03033DF5C00964C50 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */

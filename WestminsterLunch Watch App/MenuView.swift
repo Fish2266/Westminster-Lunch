@@ -5,32 +5,48 @@ import SwiftUI
 /// paging TabView (the same interaction watchOS users already know from
 /// built-in apps like Activity).
 ///
+/// Only school days are pages: Saturdays and Sundays are skipped entirely,
+/// because no food is served then and a weekend page could only ever show
+/// "No menu available". Swiping right from Friday lands on Monday.
+///
 /// Only a fixed window of days around today is offered — Flik/Nutrislice only
 /// ever has real data for roughly the current week either direction, so
-/// unlimited swiping would just page through empty "No menu available" screens
-/// forever with no way to find your way back to today easily.
+/// unlimited swiping would just page through empty screens forever with no way
+/// to find your way back to today easily.
 struct MenuView: View {
     let location: DiningLocation
 
-    /// A week back, a week ahead. Adjust this range if Flik's site turns out
-    /// to publish further out and further back swiping would be useful.
-    private static let dayOffsetRange = -7...7
+    /// A school week back, a school week ahead. Adjust if Flik turns out to
+    /// publish further out and further swiping would be useful.
+    private static let schoolDaysEitherWay = 5
 
-    @State private var selectedDayOffset = 0
+    /// Resolved once, when the view is created, so the pages (and therefore
+    /// the selected index) don't shift underneath the person if the date rolls
+    /// over while they're looking at the screen.
+    private let days: [Date]
+
+    @State private var selectedIndex: Int
+
+    init(location: DiningLocation) {
+        self.location = location
+        let days = SchoolCalendar.schoolDays(
+            back: Self.schoolDaysEitherWay,
+            forward: Self.schoolDaysEitherWay
+        )
+        self.days = days
+        // Start on the centre page: today, or the next school day on a weekend.
+        _selectedIndex = State(initialValue: Self.schoolDaysEitherWay)
+    }
 
     var body: some View {
-        TabView(selection: $selectedDayOffset) {
-            ForEach(Self.dayOffsetRange, id: \.self) { offset in
-                MenuDayView(location: location, date: date(forOffset: offset))
-                    .tag(offset)
+        TabView(selection: $selectedIndex) {
+            ForEach(Array(days.enumerated()), id: \.offset) { index, date in
+                MenuDayView(location: location, date: date)
+                    .tag(index)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .automatic))
         .navigationTitle(location.displayName)
-    }
-
-    private func date(forOffset offset: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: offset, to: Date()) ?? Date()
     }
 }
 

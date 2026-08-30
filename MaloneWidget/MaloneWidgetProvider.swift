@@ -88,7 +88,11 @@ struct MaloneWidgetProvider: TimelineProvider {
     }
 
     private func bestCachedMenu(for location: DiningLocation, now: Date) async -> DayMenu? {
-        if let today = await MenuService.shared.cachedMenu(for: location, date: now) {
+        // On a Saturday or Sunday the "current" day is Monday: no food is served
+        // over the weekend, so the useful thing to show is the next school day's
+        // lunch rather than an empty card.
+        let displayDay = SchoolCalendar.currentDay(from: now)
+        if let today = await MenuService.shared.cachedMenu(for: location, date: displayDay) {
             return today
         }
         return await MenuService.shared.mostRecentCachedMenu(for: location)
@@ -112,16 +116,12 @@ struct MaloneWidgetProvider: TimelineProvider {
         )
     }
 
-    /// Returns cached data if it's from today already; otherwise fetches fresh
-    /// (which also updates the cache for next time). On a failed fetch it falls
-    /// back to the newest menu cached for that location, and only reports an
-    /// error when there's nothing at all to show.
+    /// Tops up the cache with the current school day and the next one (a no-op
+    /// when both were already downloaded today), then renders whichever of them
+    /// is current. On a failed fetch it falls back to the newest menu cached for
+    /// that location, and only reports an error when there's nothing to show.
     private func fetchLocation(_ location: DiningLocation, now: Date) async -> (DayMenu?, String?) {
-        if let today = await MenuService.shared.cachedMenu(for: location, date: now) {
-            return (today, nil)
-        }
-
-        let result = await MenuService.shared.menu(for: location)
+        let result = await MenuService.shared.prefetchEssentials(for: location, now: now)
         switch result {
         case .success(let menu):
             return (menu, nil)
