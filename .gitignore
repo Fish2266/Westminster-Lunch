@@ -1,0 +1,25 @@
+# Xcode — per-user state
+#
+# xcuserdata holds personal UI state (window layout, scheme ordering,
+# breakpoints) and changes on nearly every build, so it's ignored. The
+# xcshareddata/xcschemes alongside it are deliberately NOT ignored: those are
+# the shared schemes that let both targets build from a clean checkout.
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+
+# Build products / derived data
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
