@@ -36,9 +36,9 @@ enum NutrisliceConfig {
 
         components.path = "/menu/api/weeks/school/\(location.schoolSlug)/menu-type/\(location.menuTypeSlug)/\(year)/\(monthString)/\(dayString)/"
         // Deliberately no ?format=json query param: the real site never sends one
-        // (confirmed via capture) and gets JSON purely via the Accept header,
-        // which MenuService already sets. Adding format=json here produced a
-        // generic Django-level 400 rather than the expected menu JSON.
+        // (confirmed via capture) and the endpoint returns JSON regardless.
+        // Adding format=json here produced a generic Django-level 400 rather
+        // than the expected menu JSON.
 
         return components.url
     }

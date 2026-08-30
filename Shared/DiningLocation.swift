@@ -12,9 +12,9 @@ import Foundation
 ///   Hawkins → https://westminster.api.flikisdining.com/menu/api/weeks/school/campbell/menu-type/campbell/2026/08/17/
 ///   Malone  → https://westminster.api.flikisdining.com/menu/api/weeks/school/uppermiddle-school-malone-dining-hall/menu-type/lunch/2026/08/17/
 ///
-/// Both returned HTTP 200 with `Content-Type: application/json`, no auth/API key —
-/// just standard headers (see `MenuService` for the exact header set now sent to
-/// match what the real site sends, including `x-nutrislice-origin`).
+/// Both returned HTTP 200 with `Content-Type: application/json`, no auth/API key.
+/// The only header that turned out to matter is a browser-like `User-Agent` —
+/// see `MenuService.fetchWeekFromNetwork` for why.
 struct DiningLocation: Identifiable, Codable, Equatable, Hashable {
     /// The Nutrislice "school slug" for this dining hall.
     let schoolSlug: String

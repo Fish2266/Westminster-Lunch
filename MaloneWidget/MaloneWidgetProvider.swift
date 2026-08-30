@@ -18,11 +18,12 @@ struct MaloneEntry: TimelineEntry {
 /// couple of hours. Applied independently to Malone and Hawkins, so a stale or
 /// failed Hawkins fetch never blocks Malone's own data from showing.
 ///
-/// WidgetKit itself imposes a system-wide daily refresh budget that Claude/the
-/// developer cannot override — `.after(nextRefresh)` is a *request*, and the
-/// system may refresh earlier (e.g. if the person opens the watch face) or later
-/// (if the budget is exhausted). This is the most reliable, battery-efficient
-/// strategy available; there is no WidgetKit API for guaranteed instant updates.
+/// WidgetKit itself imposes a system-wide daily refresh budget that an app
+/// cannot override — `.after(nextRefresh)` is a *request*, and the system may
+/// refresh earlier (e.g. if the person raises their wrist to the watch face) or
+/// later (if the budget is exhausted). This is the most reliable,
+/// battery-efficient strategy available; there is no WidgetKit API for
+/// guaranteed instant updates.
 struct MaloneWidgetProvider: TimelineProvider {
     /// How long the provider is willing to wait on the network before giving up
     /// and rendering from cache. WidgetKit budgets `getTimeline` only a few
