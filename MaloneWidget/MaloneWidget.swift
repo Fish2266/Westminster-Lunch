@@ -40,6 +40,26 @@ struct MaloneWidgetEntryView: View {
             }
         }
         .widgetURL(deepLinkURL)
+        // Declaring a container background is required, not cosmetic: since
+        // watchOS 10 a widget that never declares one isn't laid out by the
+        // Smart Stack the way the Simulator forgivingly renders it, and on real
+        // hardware it shows up as an empty black card.
+        //
+        // `.fill.tertiary` is the deliberate choice here — it reads as a solid
+        // system-dark fill rather than a translucent one, and that's what looks
+        // right on-device. Do not "upgrade" this to a glassier material:
+        //
+        //  - `.ultraThinMaterial` / `.thinMaterial` are translucent, but they
+        //    are NOT the backing Apple's own Smart Stack widgets (Messages,
+        //    Health) use. That treatment is not reachable from public API at
+        //    all — confirmed by Apple DTS on the developer forums (thread
+        //    815955), tracked as feedback FB22059614. watchOS also has no
+        //    `glassEffect`/`Glass` API (absent from the watchOS 26.5 SwiftUI
+        //    interface; iOS/macOS only), so there is nothing else to reach for.
+        //  - AccessoryWidgetBackground is built for watch-face complications
+        //    and the Lock Screen; inside a rectangular Smart Stack widget it
+        //    draws a stray circular disc. Verified broken on device.
+        .containerBackground(.fill.tertiary, for: .widget)
     }
 
     // MALONE               SANDWICHES
@@ -72,10 +92,22 @@ struct MaloneWidgetEntryView: View {
         .accessibilityLabel(accessibilityText)
     }
 
+    /// Abbreviated weekday of the data being shown, but only when it isn't
+    /// today's — so the fallback to an older cached menu (which is what keeps
+    /// the widget from rendering empty when the watch can't reach the network)
+    /// is never silently passed off as today's lunch.
+    private var staleDayLabel: String? {
+        guard let menuDate = entry.maloneMenu?.date,
+              !Calendar.current.isDate(menuDate, inSameDayAs: entry.date) else { return nil }
+        return menuDate.formatted(.dateTime.weekday(.abbreviated)).uppercased()
+    }
+
     private var maloneColumn: some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text("MALONE")
+            Text(staleDayLabel.map { "MALONE · \($0)" } ?? "MALONE")
                 .font(.system(size: 11, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .accessibilityAddTraits(.isHeader)
             columnOfItems(maloneItemNames.prefix(2))
             if maloneItemNames.count > 2 {
@@ -100,7 +132,8 @@ struct MaloneWidgetEntryView: View {
     private var accessibilityText: String {
         var parts: [String] = []
         if !maloneItemNames.isEmpty {
-            parts.append("Malone lunch: \(maloneItemNames.joined(separator: ", "))")
+            let when = staleDayLabel == nil ? "" : " from \(staleDayLabel!)"
+            parts.append("Malone lunch\(when): \(maloneItemNames.joined(separator: ", "))")
         }
         if !hawkinsSandwichNames.isEmpty {
             parts.append("Hawkins sandwiches: \(hawkinsSandwichNames.joined(separator: ", "))")

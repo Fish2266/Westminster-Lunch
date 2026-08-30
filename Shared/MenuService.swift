@@ -35,8 +35,26 @@ actor MenuService {
     private let session: URLSession
     private let cache = MenuCache()
 
-    init(session: URLSession = .shared) {
+    init(session: URLSession = MenuService.makeDefaultSession()) {
         self.session = session
+    }
+
+    /// A session with hard, short timeouts.
+    ///
+    /// This matters most in the widget extension: WidgetKit gives `getTimeline`
+    /// only a few seconds of wall time on real hardware, and a watch whose radio
+    /// is asleep or off-wrist can leave `URLSession.shared` (60s request timeout,
+    /// and `waitsForConnectivity` behaviour that can stall indefinitely) hanging
+    /// well past that budget. When that happens the extension is killed before it
+    /// ever calls the timeline completion handler, and watchOS renders the widget
+    /// as an empty black card — the exact symptom that never reproduces in the
+    /// Simulator, where the request resolves instantly over the Mac's network.
+    static func makeDefaultSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 8
+        configuration.timeoutIntervalForResource = 10
+        configuration.waitsForConnectivity = false
+        return URLSession(configuration: configuration)
     }
 
     /// Fetches today's (or `date`'s) menu for a location from the network.
@@ -65,6 +83,13 @@ actor MenuService {
     /// budget re-fetching data the app already downloaded recently.
     func cachedMenu(for location: DiningLocation, date: Date = Date()) -> DayMenu? {
         cache.load(for: location, date: date)
+    }
+
+    /// The newest cached menu for a location whatever day it belongs to — the
+    /// widget's last resort so it can always render *something* rather than an
+    /// empty card. See `MenuCache.loadMostRecent(for:)`.
+    func mostRecentCachedMenu(for location: DiningLocation) -> DayMenu? {
+        cache.loadMostRecent(for: location)
     }
 
     private func fetchFromNetwork(location: DiningLocation, date: Date) async throws -> DayMenu {

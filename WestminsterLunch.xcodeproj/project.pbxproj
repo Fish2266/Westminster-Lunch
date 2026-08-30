@@ -80,6 +80,11 @@
 			path = "WestminsterLunch Watch App";
 			sourceTree = "<group>";
 		};
+		28A712C03033DF5C00964C50 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		28A712A33033DF5900964C50 /* MaloneWidget */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -116,6 +121,7 @@
 				28A712B63033E24B00964C50 /* MaloneWidgetExtension.entitlements */,
 				28A712893033DEFD00964C50 /* WestminsterLunch Watch App */,
 				28A712A33033DF5900964C50 /* MaloneWidget */,
+				28A712C03033DF5C00964C50 /* Shared */,
 				28A7129E3033DF5900964C50 /* Frameworks */,
 				28A712803033DEFD00964C50 /* Products */,
 			);
@@ -178,6 +184,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				28A712893033DEFD00964C50 /* WestminsterLunch Watch App */,
+				28A712C03033DF5C00964C50 /* Shared */,
 			);
 			name = "WestminsterLunch Watch App";
 			packageProductDependencies = (
@@ -200,6 +207,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				28A712A33033DF5900964C50 /* MaloneWidget */,
+				28A712C03033DF5C00964C50 /* Shared */,
 			);
 			name = MaloneWidgetExtension;
 			packageProductDependencies = (
