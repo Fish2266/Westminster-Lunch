@@ -31,7 +31,12 @@ struct MaloneWidgetProvider: TimelineProvider {
     /// been called by then the extension is terminated and watchOS shows an
     /// empty black card. Completing early with slightly stale data always beats
     /// not completing at all.
-    private static let networkDeadline: TimeInterval = 6
+    ///
+    /// Derived from the request timeout rather than picked independently, and it
+    /// has to stay the larger of the two. The race below is a backstop for the
+    /// fetch finishing *early*, not a way to abandon one in progress — see
+    /// `MenuService.requestTimeout`, which is what really bounds this function.
+    private static let networkDeadline: TimeInterval = MenuService.requestTimeout + 1
 
     func placeholder(in context: Context) -> MaloneEntry {
         MaloneEntry(date: Date(), maloneMenu: nil, hawkinsMenu: nil, errorMessage: nil)

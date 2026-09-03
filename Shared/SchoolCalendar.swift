@@ -6,34 +6,57 @@ import Foundation
 /// served — so every part of the app treats weekends as days that don't exist:
 /// swiping through days skips them, and "tomorrow" on a Friday means Monday.
 enum SchoolCalendar {
+    /// `Calendar.current` builds a fresh snapshot of the wearer's calendar on
+    /// every access, so the loops below took one per step. They now take one
+    /// per call — `schoolDays` runs on every `MenuView` initialization, which
+    /// SwiftUI does on each parent update.
     private static var calendar: Calendar { Calendar.current }
 
     /// Monday–Friday. There's no holiday calendar here: a weekday with no
     /// published menu still shows up, and simply renders its empty state.
     static func isSchoolDay(_ date: Date) -> Bool {
+        isSchoolDay(date, in: calendar)
+    }
+
+    private static func isSchoolDay(_ date: Date, in calendar: Calendar) -> Bool {
         !calendar.isDateInWeekend(date)
     }
 
     /// `date` itself if it's a school day, otherwise the next one after it.
     static func schoolDay(onOrAfter date: Date) -> Date {
-        var day = calendar.startOfDay(for: date)
-        while !isSchoolDay(day) {
-            day = calendar.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86_400)
-        }
-        return day
+        step(from: date, by: 1, startingAtDate: true)
     }
 
     static func nextSchoolDay(after date: Date) -> Date {
-        let dayAfter = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date))
-            ?? date.addingTimeInterval(86_400)
-        return schoolDay(onOrAfter: dayAfter)
+        step(from: date, by: 1, startingAtDate: false)
     }
 
     static func previousSchoolDay(before date: Date) -> Date {
-        var day = calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: date))
-            ?? date.addingTimeInterval(-86_400)
-        while !isSchoolDay(day) {
-            day = calendar.date(byAdding: .day, value: -1, to: day) ?? day.addingTimeInterval(-86_400)
+        step(from: date, by: -1, startingAtDate: false)
+    }
+
+    /// Walks a day at a time in `direction` until it lands on a school day.
+    ///
+    /// Bounded rather than a bare `while`: every calendar this runs on has at
+    /// most a two-day weekend, so more than a week of stepping means the date
+    /// arithmetic has stopped advancing, and spinning forever on a watch is a
+    /// far worse failure than returning the day we reached.
+    private static func step(from date: Date, by direction: Int, startingAtDate: Bool) -> Date {
+        let calendar = self.calendar
+        var day = calendar.startOfDay(for: date)
+
+        func advance() {
+            day = calendar.date(byAdding: .day, value: direction, to: day)
+                ?? day.addingTimeInterval(TimeInterval(direction) * 86_400)
+        }
+
+        if !startingAtDate {
+            advance()
+        }
+        var stepsLeft = 7
+        while !isSchoolDay(day, in: calendar), stepsLeft > 0 {
+            advance()
+            stepsLeft -= 1
         }
         return day
     }

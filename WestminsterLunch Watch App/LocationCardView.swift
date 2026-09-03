@@ -22,6 +22,6 @@ struct LocationCardView: View {
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.thinMaterial))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(location.displayName) lunch menu")
-        .accessibilityHint("Opens today's lunch menu")
+        .accessibilityHint("Opens the lunch menu, starting with today")
     }
 }

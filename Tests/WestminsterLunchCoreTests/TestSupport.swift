@@ -50,20 +50,46 @@ final class StubURLProtocol: URLProtocol {
     /// Every request the service actually made, in order — lets tests assert
     /// that the cache spared a redundant fetch.
     nonisolated(unsafe) static var recordedRequests: [URLRequest] = []
+    /// When each of those requests arrived, recorded before any delay is
+    /// applied — so a test can tell whether two requests overlapped.
+    nonisolated(unsafe) static var arrivalTimes: [Date] = []
     /// Holds each response open this long, so a test can have a second caller
     /// arrive while the first request is genuinely still in flight.
     nonisolated(unsafe) static var responseDelay: TimeInterval = 0
 
     private static let lock = NSLock()
 
+    /// Delayed responses are delivered from here rather than by sleeping in
+    /// `startLoading`. `URLSession` calls `startLoading` on one serial queue, so
+    /// a blocking sleep there made every request wait for the one before it —
+    /// which silently caps concurrency at 1 and would make any assertion about
+    /// two requests running in parallel pass or fail for the wrong reason.
+    private static let responseQueue = DispatchQueue(
+        label: "StubURLProtocol.responses",
+        attributes: .concurrent
+    )
+
     static func reset() {
         handler = nil
         responseDelay = 0
-        lock.withLock { recordedRequests = [] }
+        lock.withLock {
+            recordedRequests = []
+            arrivalTimes = []
+        }
     }
 
     static var requestCount: Int {
         lock.withLock { recordedRequests.count }
+    }
+
+    /// How far apart the first and last request arrived. Near zero means they
+    /// were issued together; near `responseDelay` means the second one wasn't
+    /// issued until the first had finished.
+    static var arrivalSpread: TimeInterval {
+        lock.withLock {
+            guard let first = arrivalTimes.min(), let last = arrivalTimes.max() else { return 0 }
+            return last.timeIntervalSince(first)
+        }
     }
 
     static func makeSession() -> URLSession {
@@ -78,13 +104,23 @@ final class StubURLProtocol: URLProtocol {
 
     override func startLoading() {
         // `startLoading` runs on URLSession's own threads, so concurrent
-        // requests would otherwise race on this array.
-        Self.lock.withLock { Self.recordedRequests.append(request) }
-
-        if Self.responseDelay > 0 {
-            Thread.sleep(forTimeInterval: Self.responseDelay)
+        // requests would otherwise race on these arrays.
+        Self.lock.withLock {
+            Self.recordedRequests.append(request)
+            Self.arrivalTimes.append(Date())
         }
 
+        let delay = Self.responseDelay
+        guard delay > 0 else {
+            respond()
+            return
+        }
+        Self.responseQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.respond()
+        }
+    }
+
+    private func respond() {
         guard let handler = Self.handler, let url = request.url else {
             client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
             return

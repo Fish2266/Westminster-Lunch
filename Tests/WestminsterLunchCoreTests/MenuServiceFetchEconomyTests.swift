@@ -10,7 +10,9 @@ final class MenuServiceFetchEconomyTests: XCTestCase {
 
     private let thursday = date(2026, 8, 20)
     private let friday = date(2026, 8, 21)
+    // The week after Thursday/Friday's, so it needs its own response.
     private let nextTuesday = date(2026, 8, 25)
+    private let nextWednesday = date(2026, 8, 26)
 
     override func setUp() {
         super.setUp()
@@ -32,6 +34,28 @@ final class MenuServiceFetchEconomyTests: XCTestCase {
     private func serveTheSameWeekForEveryRequest() {
         StubURLProtocol.handler = { _ in
             (200, weekJSON(days: [
+                (date: "2026-08-20", menuItems: [sectionTitle("Entrees"), foodItem("Thursday Food")]),
+                (date: "2026-08-21", menuItems: [sectionTitle("Entrees"), foodItem("Friday Food")]),
+            ]))
+        }
+    }
+
+    /// Answers with the real week containing the requested date, so a test can
+    /// tell apart a response that legitimately covers a caller's day from one
+    /// that doesn't. Matched on `absoluteString` — `URL.path` normalizes the
+    /// trailing slash away, which once made a stub answer every request alike.
+    private func serveTheWeekTheRequestAsksFor() {
+        StubURLProtocol.handler = { request in
+            let url = request.url?.absoluteString ?? ""
+            let weekOfAugust24 = ["/2026/08/24/", "/2026/08/25/", "/2026/08/26/",
+                                  "/2026/08/27/", "/2026/08/28/"]
+            if weekOfAugust24.contains(where: url.contains) {
+                return (200, weekJSON(days: [
+                    (date: "2026-08-25", menuItems: [sectionTitle("Entrees"), foodItem("Tuesday Food")]),
+                    (date: "2026-08-26", menuItems: [sectionTitle("Entrees"), foodItem("Wednesday Food")]),
+                ]))
+            }
+            return (200, weekJSON(days: [
                 (date: "2026-08-20", menuItems: [sectionTitle("Entrees"), foodItem("Thursday Food")]),
                 (date: "2026-08-21", menuItems: [sectionTitle("Entrees"), foodItem("Friday Food")]),
             ]))
@@ -88,6 +112,47 @@ final class MenuServiceFetchEconomyTests: XCTestCase {
         XCTAssertEqual(StubURLProtocol.requestCount, 2, "two different weeks need two requests")
         XCTAssertEqual(try? fridayResult.get().categories.first?.items.first?.name, "Friday Food")
         XCTAssertEqual(try? tuesdayResult.get().categories.first?.items.first?.name, "Tuesday Food")
+    }
+
+    /// Two pages of one week must share a download even while a *different*
+    /// week is already being downloaded. Keying the in-flight download by
+    /// location alone meant both of these missed the single slot and each
+    /// fetched the same week.
+    func testTwoPagesOfTheSameWeekShareOneDownloadWhileAnotherWeekIsInFlight() async {
+        serveTheWeekTheRequestAsksFor()
+        StubURLProtocol.responseDelay = 0.3
+
+        async let a = service.menu(for: .malone, date: friday)
+        async let b = service.menu(for: .malone, date: nextTuesday)
+        async let c = service.menu(for: .malone, date: nextWednesday)
+        let (fridayResult, tuesdayResult, wednesdayResult) = await (a, b, c)
+
+        XCTAssertEqual(StubURLProtocol.requestCount, 2, "two weeks should cost two downloads, not three")
+        XCTAssertEqual(try? fridayResult.get().categories.first?.items.first?.name, "Friday Food")
+        XCTAssertEqual(try? tuesdayResult.get().categories.first?.items.first?.name, "Tuesday Food")
+        XCTAssertEqual(try? wednesdayResult.get().categories.first?.items.first?.name, "Wednesday Food")
+    }
+
+    /// A page whose week is not the one in flight must issue its request
+    /// straight away. It used to await the unrelated download in full, find its
+    /// day missing from the response, and only then start its own — so the three
+    /// weeks an eleven-page window spans ran end-to-end. On a watch whose radio
+    /// is asleep, each of those legs is a request timeout, and the far pages sat
+    /// on "Loading lunch…" for a multiple of it.
+    func testACallerForAnotherWeekDoesNotQueueBehindTheRunningOne() async {
+        serveTheWeekTheRequestAsksFor()
+        StubURLProtocol.responseDelay = 0.4
+
+        async let a = service.menu(for: .malone, date: friday)
+        async let b = service.menu(for: .malone, date: nextTuesday)
+        _ = await (a, b)
+
+        XCTAssertEqual(StubURLProtocol.requestCount, 2)
+        XCTAssertLessThan(
+            StubURLProtocol.arrivalSpread,
+            0.3,
+            "the second week's request wasn't issued until the first had finished"
+        )
     }
 
     func testConcurrentLocationsDoNotBlockEachOther() async {

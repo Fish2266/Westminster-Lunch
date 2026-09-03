@@ -10,7 +10,7 @@ The app reads the same public Nutrislice/Flik JSON API that powers
 - **Two dining halls** — Hawkins and Malone, listed on the home screen.
 - **Day browsing** — swipe through past and upcoming days. Weekends are skipped entirely: no food is served, so swiping right from Friday lands on Monday.
 - **Fully dynamic categories** — sections ("Entrees", "Sandwich #1", …) come straight from Flik. Nothing is hardcoded, so a new category on Flik's side shows up automatically instead of disappearing.
-- **Frugal with the network** — one response covers a whole week, and a menu already downloaded today isn't downloaded again, so paging across the week costs about one request. Pull-to-refresh and the Refresh button always fetch.
+- **Frugal with the network** — one response covers a whole week, only the page you're actually looking at loads, and a menu already downloaded today isn't downloaded again, so paging across the week costs about one request. Pull-to-refresh and the Refresh button always fetch.
 - **Offline-friendly** — the last successful download is cached in a shared App Group container, so the app and widget can render without a network round trip. Entries older than 30 days are pruned automatically.
 - **Malone Smart Stack widget** — supports `accessoryRectangular`, `accessoryInline`, and `accessoryCircular`. The rectangular family shows Malone's first items alongside Hawkins's three sandwich-station items, and tapping it opens that menu in the app.
 - **Honest staleness** — if the widget has to fall back to an older cached menu, it labels it with that day's weekday rather than passing it off as today's lunch.
@@ -92,7 +92,13 @@ https://westminster.api.flikisdining.com/menu/api/weeks/school/{school}/menu-typ
 ```
 
 `MenuService` requests the week containing the target date and picks out the
-matching day. Three details are load-bearing, documented inline in the source and
+matching day. Any date in a week produces a different URL but the same response,
+so in-flight downloads are deduplicated by `(location, week)` — keyed by location
+alone, a page whose week wasn't the one in flight waited out that unrelated
+request in full before starting its own, and two pages of one week could each
+download it.
+
+Three details are load-bearing, documented inline in the source and
 pinned by tests:
 
 - the month and day must be zero-padded (`08`, not `8`),
@@ -128,15 +134,45 @@ title. The `.id(location)` on the `navigationDestination` in
 `WestminsterLunchApp` is what declares the two halls to be different screens.
 
 The same reasoning is why the day pages are keyed by their `Date` rather than by
-position in the array.
+position in the array, and why `MenuDayView` takes its date as a view input
+instead of reading it back out of its view model: a `@StateObject` outlives the
+value that created it, so anything derived from it can end up describing a
+different day than the page it's drawn on.
+
+The link's promise is "this hall's lunch, **today**", and the path can't express
+the second half of that. Tapping the Malone widget while already on the Malone
+screen produces a path identical to the one already there, so SwiftUI sees no
+change and the screen keeps whichever day was last swiped to. `AppRouter`
+therefore publishes an `openRequest` carrying a fresh token alongside the path,
+and `MenuView` re-centres its window on the current school day whenever one
+arrives.
+
+The day is deliberately *not* encoded in the URL. A widget URL is baked into a
+timeline entry that WidgetKit may still be showing long after the day it was
+built for, so a literal date in the link would open the app on a day that has
+already passed. "Now" is resolved when the tap happens.
+
+`MenuView`'s window of days is a snapshot for the same reason it has to be one —
+recomputing it in `body` would move the person's page underneath them on every
+parent update — but a watch app stays resident for days, so it is also
+re-centred when the app becomes active and the date has since rolled over.
+Without that, the window still starts from the day it was built and the page
+labelled "today" isn't.
 
 ## Widget refresh behavior
 
 The widget prefers cached data and requests at most one network refresh per
 calendar day, since a published lunch menu doesn't change during the day. It
-races the fetch against a 6-second deadline so the timeline handler always
-completes — WidgetKit terminates an extension that overruns its budget, which
-renders as an empty black card on real hardware.
+races the fetch against a deadline so the timeline handler always completes —
+WidgetKit terminates an extension that overruns its budget, which renders as an
+empty black card on real hardware.
+
+That race is a backstop for the fetch finishing *early*, not a way to abandon one
+in progress: the download runs in an unstructured `Task` that cancellation
+doesn't reach, and `withTaskGroup` doesn't return until its children do. What
+actually bounds `getTimeline` is `MenuService.requestTimeout`, which is why the
+deadline is derived from it rather than picked separately — the timeout has to
+stay the smaller of the two.
 
 ## Notes
 

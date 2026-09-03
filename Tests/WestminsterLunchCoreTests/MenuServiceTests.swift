@@ -212,6 +212,49 @@ final class MenuServiceTests: XCTestCase {
         XCTAssertTrue(url.hasSuffix("/2026/08/21/"), "unexpected URL shape: \(url)")
     }
 
+    // MARK: - Week grouping
+
+    func testEverySchoolDayOfOneWeekSharesAWeekStart() {
+        // This is the key `MenuService` dedupes in-flight downloads by, so
+        // every day one response covers has to map to one value — otherwise two
+        // pages of the same week each download it.
+        let mondayToFriday = (24...28).map { date(2026, 8, $0) }
+        let starts = Set(mondayToFriday.map { NutrisliceConfig.weekStart(containing: $0) })
+
+        XCTAssertEqual(starts.count, 1, "one Mon–Sun week produced \(starts.count) keys")
+        XCTAssertEqual(starts.first, date(2026, 8, 24), "the week should be anchored to its Monday")
+    }
+
+    func testNeighbouringWeeksDoNotShareAWeekStart() {
+        // The mirror image: Friday and the following Monday come from different
+        // responses, so a caller for one must not wait on the other's download.
+        XCTAssertNotEqual(
+            NutrisliceConfig.weekStart(containing: date(2026, 8, 21)),
+            NutrisliceConfig.weekStart(containing: date(2026, 8, 24))
+        )
+        XCTAssertNotEqual(
+            NutrisliceConfig.weekStart(containing: date(2026, 8, 28)),
+            NutrisliceConfig.weekStart(containing: date(2026, 8, 31))
+        )
+    }
+
+    func testWeekStartIgnoresTheRegionsFirstWeekday() {
+        // `Calendar.current.firstWeekday` is Sunday in the US, so asking the
+        // wearer's calendar for "the week" would split Nutrislice's Mon–Sun
+        // week down the middle for anyone whose region starts it elsewhere.
+        // The grouping has to follow the server, not the watch.
+        var sundayFirst = Calendar(identifier: .gregorian)
+        sundayFirst.firstWeekday = 1
+        let sunday = date(2026, 8, 23)
+
+        XCTAssertEqual(NutrisliceConfig.weekStart(containing: date(2026, 8, 24)), date(2026, 8, 24))
+        XCTAssertEqual(
+            NutrisliceConfig.weekStart(containing: sunday),
+            date(2026, 8, 17),
+            "Sunday belongs to the week that started the Monday before it"
+        )
+    }
+
     // MARK: - Caching behavior
 
     func testOneRequestCachesEveryDayOfTheWeek() async {

@@ -42,4 +42,25 @@ enum NutrisliceConfig {
 
         return components.url
     }
+
+    /// The Monday of the Mon–Sun week that `weekMenuURL(for:weekOf:)` would
+    /// return for `date`.
+    ///
+    /// Any date in a week yields a *different* URL but the *same* response, so
+    /// this is what lets `MenuService` recognize that two callers are waiting on
+    /// one download — keying that by location alone made a page whose week was
+    /// already in flight wait out an unrelated week's whole request first, and
+    /// let two pages of the same week each start their own.
+    ///
+    /// Anchored to Monday through a fixed Gregorian calendar rather than
+    /// `Calendar.current`, whose `firstWeekday` follows the watch's region (it is
+    /// Sunday in the US): the grouping has to match the week Nutrislice serves,
+    /// not the week the wearer's locale starts on.
+    static func weekStart(containing date: Date) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = Calendar.current.timeZone
+        calendar.firstWeekday = 2
+        return calendar.dateInterval(of: .weekOfYear, for: date)?.start
+            ?? Calendar.current.startOfDay(for: date)
+    }
 }

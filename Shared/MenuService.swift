@@ -49,6 +49,21 @@ actor MenuService {
         self.cache = cache
     }
 
+    /// The hard ceiling on one menu request, and — because of how the widget's
+    /// deadline actually behaves — on `getTimeline` itself.
+    ///
+    /// `MaloneWidgetProvider` races its fetch against a deadline so the timeline
+    /// handler always completes. That race can only stop the provider *waiting*:
+    /// the download runs in an unstructured `Task` (see `runningFetches`) that
+    /// cancellation doesn't reach, and `withTaskGroup` doesn't return until its
+    /// children do. So the real bound on how long the extension can run is this
+    /// timeout, not that deadline, and this has to stay the smaller of the two —
+    /// `MaloneWidgetProvider.networkDeadline` derives itself from it for that
+    /// reason. Let it grow past the deadline and the extension overruns its
+    /// WidgetKit budget, gets killed before calling the completion handler, and
+    /// watchOS draws the widget as an empty black card.
+    static let requestTimeout: TimeInterval = 5
+
     /// A session with hard, short timeouts.
     ///
     /// This matters most in the widget extension: WidgetKit gives `getTimeline`
@@ -59,10 +74,15 @@ actor MenuService {
     /// ever calls the timeline completion handler, and watchOS renders the widget
     /// as an empty black card — the exact symptom that never reproduces in the
     /// Simulator, where the request resolves instantly over the Mac's network.
+    ///
+    /// The resource timeout matches the request timeout rather than exceeding
+    /// it: a menu is one small JSON response, so there is no second leg for the
+    /// larger budget to cover — it only widened the window in which the
+    /// extension could be killed.
     static func makeDefaultSession() -> URLSession {
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 8
-        configuration.timeoutIntervalForResource = 10
+        configuration.timeoutIntervalForRequest = requestTimeout
+        configuration.timeoutIntervalForResource = requestTimeout
         configuration.waitsForConnectivity = false
         return URLSession(configuration: configuration)
     }
@@ -156,9 +176,34 @@ actor MenuService {
         return result ?? .failure(.noDataForDate)
     }
 
-    /// The download currently running for each location, so callers that arrive
-    /// while one is in flight can wait for it instead of starting their own.
-    private var runningFetches: [String: Task<[DayMenu], Error>] = [:]
+    /// Identifies one download: a location plus the Mon–Sun week whose response
+    /// covers it. Keying by location alone conflated every week into a single
+    /// slot — see `runningFetches`.
+    private struct WeekKey: Hashable {
+        let schoolSlug: String
+        let weekStart: Date
+
+        init(location: DiningLocation, date: Date) {
+            schoolSlug = location.schoolSlug
+            weekStart = NutrisliceConfig.weekStart(containing: date)
+        }
+    }
+
+    /// The download currently running for each (location, week), so callers that
+    /// arrive while one is in flight can wait for it instead of starting their own.
+    ///
+    /// The week has to be part of the key. When this was keyed by location only,
+    /// the single slot held whichever week was fetched last, and the day pages —
+    /// which open eleven at a time spanning three weeks — paid for it twice:
+    ///
+    ///  - a page whose week was *not* the one in flight still awaited that
+    ///    request in full, discovered its day wasn't in the response, and only
+    ///    then started its own, so the three weeks ran end-to-end instead of
+    ///    together (with the 8s request timeout on a sleeping watch radio that
+    ///    is ~24s of "Loading lunch…" rather than ~8s);
+    ///  - and two pages of the same week could both miss the slot and each
+    ///    download it, overwriting one another's entry.
+    private var runningFetches: [WeekKey: Task<[DayMenu], Error>] = [:]
 
     /// Fetches the week containing `date` and caches **every** day in it, then
     /// returns the one for `date`. Caching the sibling days is free — the
@@ -168,29 +213,32 @@ actor MenuService {
     /// When several day pages appear at once they all land here within
     /// milliseconds of each other, before any of them has written to the cache.
     /// Since one response covers a whole week, a caller that finds a download
-    /// already running for this location waits for it and takes its day out of
-    /// the result — turning a screenful of pages into one request instead of
-    /// one request each. A caller whose day isn't in that week (the window
-    /// spans two of them) still goes and fetches its own.
+    /// already running for *its own* week waits for it and takes its day out of
+    /// the result — turning a week's worth of pages into one request instead of
+    /// one request each. A caller from a different week starts its own download
+    /// straight away, in parallel, rather than queueing behind an unrelated one.
     private func fetchDayCachingWholeWeek(location: DiningLocation, date: Date) async throws -> DayMenu {
-        if let running = runningFetches[location.schoolSlug],
-           let week = try? await running.value,
-           let match = Self.day(matching: date, in: week) {
-            return match
+        let key = WeekKey(location: location, date: date)
+
+        // Someone is already downloading exactly this week: wait for it rather
+        // than asking the server for the same thing. A failure is propagated
+        // instead of retried — the caller that started it has already fallen
+        // back to the cache, and a second identical request to a server that
+        // just failed only costs another timeout.
+        if let running = runningFetches[key] {
+            let week = try await running.value
+            return try Self.day(matching: date, in: week)
         }
 
         // Deliberately unstructured: the point is for *other* callers to be
         // able to await this same work, which a child task couldn't offer them.
         // `URLSession`'s own timeouts bound how long it can live.
         let task = Task { try await self.fetchWeekFromNetwork(location: location, date: date) }
-        runningFetches[location.schoolSlug] = task
-        defer {
-            // Only clear our own entry: a second caller whose day wasn't in our
-            // week may already have replaced it with its download.
-            if runningFetches[location.schoolSlug] == task {
-                runningFetches[location.schoolSlug] = nil
-            }
-        }
+        runningFetches[key] = task
+        // Safe to clear unconditionally, unlike the location-keyed version this
+        // replaced: the lookup above and this assignment are one uninterrupted
+        // run of actor-isolated code, so no second task can exist for this key.
+        defer { runningFetches[key] = nil }
 
         let week = try await task.value
         for day in week {
@@ -198,15 +246,18 @@ actor MenuService {
         }
         cache.pruneExpiredEntries(for: location)
 
-        guard let match = Self.day(matching: date, in: week) else {
+        return try Self.day(matching: date, in: week)
+    }
+
+    /// Picks `date` out of a week response. A week that doesn't contain the day
+    /// means Flik hasn't published it, which is `noDataForDate` — the caller
+    /// used to re-request the very same week on this path.
+    private static func day(matching date: Date, in week: [DayMenu]) throws -> DayMenu {
+        let calendar = Calendar.current
+        guard let match = week.first(where: { calendar.isDate($0.date, inSameDayAs: date) }) else {
             throw MenuServiceError.noDataForDate
         }
         return match
-    }
-
-    private static func day(matching date: Date, in week: [DayMenu]) -> DayMenu? {
-        let calendar = Calendar.current
-        return week.first { calendar.isDate($0.date, inSameDayAs: date) }
     }
 
     /// Downloads the week containing `date` and turns every school day in it
